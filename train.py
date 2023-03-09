@@ -13,44 +13,34 @@ from torch.optim import lr_scheduler
 from matplotlib import pyplot as plt
 
 
-os.environ["KMP_DUPLICATE_LIB_OK"]  =  "TRUE"
+def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, save_dir, data_dir):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, save_dir, data_dir, cuda):
-    if cuda:
-        device = '0'
-    else:
-        device = 'cpu'
     if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
-        print('Create ' + save_dir + ' Success!')
+        os.makedirs(save_dir)
+        print('Created directory:', save_dir)
 
     data_transforms = {
-        'train': transforms.Compose(
-            [
-                transforms.Resize((224, 224)),
-                transforms.ToTensor()
-            ]
-        )
+        'train': transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor()
+        ])
     }
 
     image_datasets = {
         mode: datasets.ImageFolder(
-            os.path.join(data_dir, mode),
+            os.path.join(data_dir, mode), 
             data_transforms[mode]
-        ) for mode in ['train']
-    }
+        ) for mode in ['train']}
 
     dataloaders = {
         mode: DataLoader(
             image_datasets[mode], 
             batch_size=batch_size, 
             shuffle=True
-        ) for mode in ['train']
-    }
+        ) for mode in ['train']}
 
-    mean = 0.
-    std = 0.
-    nb_samples = 0.
+    mean, std, nb_samples = 0., 0., 0.
     for data, _ in dataloaders['train']:
         batch_samples = data.size(0)
         data = data.view(batch_samples, data.size(1), -1)
@@ -63,42 +53,32 @@ def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, sa
     print('std:', std)
 
     with open(os.path.join(data_dir, 'mean_std.txt'), 'w') as f:
-        f.write('mean: ' + str(mean) + '\n')
-        f.write('std: ' + str(std))
+        f.write(f"mean: {mean}\n")
+        f.write(f"std: {std}\n")
 
     data_transforms = {
-        'train': transforms.Compose(
-            [
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=mean,
-                    std=std
-                )
-            ]
-        ),
-        'val': transforms.Compose(
-            [
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=mean,
-                    std=std
-                )
-            ]
-        )
+        'train': transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)
+        ]),
+        'val': transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)
+        ])
     }
 
     image_datasets = {
         mode: datasets.ImageFolder(
-            os.path.join(data_dir, mode),
+            os.path.join(data_dir, mode), 
             data_transforms[mode]
         ) for mode in ['train', 'val']
     }
 
     with open(os.path.join(data_dir, 'class_to_idx.txt'), 'w') as f:
         for classes in image_datasets['train'].class_to_idx:
-            f.write(classes + ' ' + str(image_datasets['train'].class_to_idx[classes]) + '\n')
+            f.write(f"{classes} {str(image_datasets['train'].class_to_idx[classes])}\n")
 
     dataloaders = {
         mode: DataLoader(
@@ -108,14 +88,11 @@ def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, sa
         ) for mode in ['train', 'val']
     }
 
-    dataset_sizes = {
-        mode: len(image_datasets[mode]) for mode in ['train', 'val']
-    }
+    dataset_sizes = {mode: len(image_datasets[mode]) for mode in ['train', 'val']}
     print(dataset_sizes)
     class_names = image_datasets['train'].classes
     print(class_names)
-    device = ('cpu' if len(device) > 1 else 'cuda:' + device) if torch.cuda.is_available() else 'cpu'
-    print('Use', device)
+    print(f"Using device: {device}")
 
     if mobilenet:
         model_save_path = os.path.join(save_dir, 'MobileNet_v2_epoch{}_{}_ACC{}_LOSS{}.pt')
@@ -129,6 +106,7 @@ def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, sa
         model.classifier[6] = nn.Linear(fc_features, len(class_names))
     else:
         raise ValueError('MobileNet value or VGG value is not exist')
+
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
@@ -164,11 +142,14 @@ def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, sa
             
             if phase == 'train':
                 exp_lr_scheduler.step()
+
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
+
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
             print('//////////////////////////////////////////')
             print(phase)
+
             if phase == 'val':
                 save_name = model_save_path.format(
                     epoch,
@@ -192,7 +173,6 @@ def parse_opt(known=False):
     parser.add_argument('--vgg', action='store_true', default=False)
     parser.add_argument('--epochs', type=int, default=40)
     parser.add_argument('--batch-size', type=int, default=64)
-    parser.add_argument('--cuda', action='store_true', default=False)
     parser.add_argument('--data-dir', type=str)
     parser.add_argument('--save-dir', type=str)
     parser.add_argument('--lr', type=float, default=0.001)
