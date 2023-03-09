@@ -1,16 +1,13 @@
 import argparse
 import os
 import time
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 from torchvision import transforms, datasets, models
-from torchvision.utils import make_grid
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
-from matplotlib import pyplot as plt
 
 
 def train(mobilenet, vgg, epochs, batch_size, lr, momentum, step_size, gamma, save_dir, data_dir):
