@@ -66,10 +66,7 @@ def run(data, cuda=False, weights='', batch_size=1, save_image_folder='', confid
             print('Score:', output)
             p, preds = torch.max(output, 1)
             if class_names[preds[0]] == 'OK':
-                result = class_names[preds[0]] if float(p[0]) > confidence else class_names[preds[0] * (-1) + 1]
-            if output[0][2] > 0.2:
-                result = class_names[2]
-                p = [output[0][2]]
+                result = class_names[preds[0]] if float(p[0]) > confidence else os.path.basename(data)
             else:
                 result = class_names[preds[0]]
             print('Predict:', result, 'value:', float(p[0]))
